@@ -1,3 +1,4 @@
+
 import hashlib
 
 ID_BITS = 160
@@ -25,7 +26,6 @@ def get_bucket_index(local_id, remote_id):
     return distance.bit_length() - 1
 
 
-
 if __name__ == "__main__":
 
     print("========== MeshWeaver Node ID ==========")
@@ -33,19 +33,10 @@ if __name__ == "__main__":
     node1 = generate_node_id("Sahana")
     node2 = generate_node_id("MeshWeaver")
 
-    print("\nNode 1 Name: Sahana")
     print("Node 1 ID:", node1)
-
-    print("\nNode 2 Name: MeshWeaver")
     print("Node 2 ID:", node2)
 
-    distance = xor_distance(node1, node2)
+    print("XOR Distance:", xor_distance(node1, node2))
+    print("Bucket Index:", get_bucket_index(node1, node2))
 
-    print("\nXOR Distance:", distance)
-
-    bucket_index = get_bucket_index(node1, node2)
-
-    print("Bucket Index:", bucket_index)
-
-    print("\n========== Execution Completed ==========")
-
+    print("========== Execution Completed ==========")
