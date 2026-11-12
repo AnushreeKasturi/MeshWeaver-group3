@@ -25,7 +25,7 @@ def get_bucket_index(local_id, remote_id):
     return distance.bit_length() - 1
 
 
-# Main program to display output
+
 if __name__ == "__main__":
 
     print("========== MeshWeaver Node ID ==========")
