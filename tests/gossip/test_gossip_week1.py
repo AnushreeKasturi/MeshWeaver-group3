@@ -1,8 +1,5 @@
-
-
 import unittest
 import json
-
 from collector import collect_system_load
 from protocol import GossipMessage, create_gossip_message
 
