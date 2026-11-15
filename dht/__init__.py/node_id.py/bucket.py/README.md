@@ -40,4 +40,12 @@ All implemented Week 1 test cases passed successfully.
 - SHA-1
 - Pytest
 - VS Code
+  ## Running Tests
+
+MeshWeaver uses pytest for testing.
+
+### Run Node ID Tests
+
+```bash
+python -m pytest dht/testcase_node_id.py -v
 
