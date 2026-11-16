@@ -48,4 +48,17 @@ MeshWeaver uses pytest for testing.
 
 ```bash
 python -m pytest dht/testcase_node_id.py -v
+# DHT Module - MeshWeaver
+
+## Overview
+
+The DHT (Distributed Hash Table) module manages node identification,
+peer distance calculation, and routing information.
+
+## Files
+
+### 1. node_id.py
+- Generates 160-bit node IDs using SHA-1.
+- Calculates XOR distance between two node IDs.
+- Determines the appropriate K-Bucket index.
 
