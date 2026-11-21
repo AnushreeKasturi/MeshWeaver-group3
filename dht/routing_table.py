@@ -4,6 +4,8 @@ from .bucket import KBucket
 from .node_id import get_bucket_index
 
 ID_BITS = 160
+def xor_distance(node_id1, node_id2):
+    return int(node_id1, 16) ^ int(node_id2, 16)
 
 
 class RoutingTable:
