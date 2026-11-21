@@ -58,8 +58,11 @@ All modules talk through one shared message format and dispatcher in
 MeshWeaver-group3/
 ├── meshweaver/
 │   ├── protocol.py      # A: shared Message format + Dispatcher
-│   ├── node.py          # A: node runtime (Week 2)
-│   ├── config.py        # A: ports, intervals, timeouts (Week 2)
+│   ├── node.py          # A: node runtime and Module interface
+│   ├── config.py        # A: ports, intervals, timeouts
+│   ├── logs.py          # A: structured event logging
+│   ├── transport.py     # A: Transport interface + minimal UDP (until B's net/ lands)
+│   ├── membership.py    # A: basic peer discovery (until C's DHT lands)
 │   ├── cli.py           # A: `meshweaver start` / `submit` (Week 4)
 │   ├── dashboard.py     # A: live rich dashboard (Week 4)
 │   ├── net/             # B: UDP/TCP transport, TLS
@@ -92,8 +95,28 @@ pip install -r requirements.txt
 python -m pytest                  # run all tests
 ```
 
-Starting nodes (`python scripts/launch_mesh.py`) and the `meshweaver` CLI
-arrive in Weeks 2 and 4.
+### Run a mesh
+
+```bash
+python scripts/launch_mesh.py                       # 10 nodes on ports 9000-9009
+python scripts/launch_mesh.py --nodes 20 --base-port 9100 --log-json
+```
+
+The launcher prints each node's peer count until every node knows all the
+others, e.g. `Mesh formed in 2.0s: every node knows all 9 others.` Logs are in
+`logs/node-<i>.log`. Ctrl+C stops every node.
+
+### Run a single node
+
+```bash
+python -m meshweaver.node --name node-0 --port 9000
+python -m meshweaver.node --name node-1 --port 9001 --seed 127.0.0.1:9000
+```
+
+Any setting can also come from a JSON file (`--config node.json`) or an
+environment variable such as `MESHWEAVER_GOSSIP_INTERVAL=5`. See
+[docs/architecture.md](docs/architecture.md#6-node-runtime-meshweavernodepy) for
+the settings table and the `Module` interface every member implements.
 
 ## The shared protocol
 
@@ -183,7 +206,7 @@ _Last checked: 21 Nov 2026 (Week 3). ✅ done · 🟡 partial · ⬜ not started
 | Week | A (`member-a`) | B (`member-b`) | C (`member--c`) | D (`member---d`) | E (`member--e`) |
 |---|---|---|---|---|---|
 | 1 | ✅ Protocol, dispatcher, architecture doc, skeleton | ⬜ No commits | ✅ Node IDs, XOR distance, k-buckets, routing table | ✅ Load collector, gossip message format | ⬜ No commits |
-| 2 | ⬜ Node runtime, config, launcher not started | ⬜ | ⬜ README updates only; no RPCs, lookup or bootstrap yet | 🟡 3-nearest-neighbour selection; `broadcast.py` and `peer_store.py` empty; no 5 s gossip loop or stale check | ⬜ |
+| 2 | ✅ Node runtime, config, structured logging, 10-node launcher, placeholder transport and peer discovery; merge into `main` pending | ⬜ | ⬜ README updates only; no RPCs, lookup or bootstrap yet | 🟡 3-nearest-neighbour selection; `broadcast.py` and `peer_store.py` empty; no 5 s gossip loop or stale check | ⬜ |
 | 3 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 
@@ -191,7 +214,7 @@ _Last checked: 21 Nov 2026 (Week 3). ✅ done · 🟡 partial · ⬜ not started
 
 | Branch | Result |
 |---|---|
-| `member-a` | ✅ 30 passed (`tests/unit/test_protocol.py`) |
+| `member-a` | ✅ 71 passed (protocol, config, logging, node runtime, 10-node mesh integration tests) |
 | `member--c` | ❌ 3 import errors: the code sits in `dht/__init__.py/node_id.py/bucket.py/` instead of `dht/`. Moved to `meshweaver/dht/`, all 25 tests pass. |
 | `member---d` | ✅ 12 passed (`collector_unit_test.py`, `protocol_unit_test.py`, `test_gossip_week1.py`) |
 | `member-b`, `member--e` | No code yet |
@@ -200,7 +223,7 @@ _Last checked: 21 Nov 2026 (Week 3). ✅ done · 🟡 partial · ⬜ not started
 
 | Member | Days with commits | Last commit |
 |---|---|---|
-| A | 13 Nov | 13 Nov |
+| A | 13, 21 Nov | 21 Nov |
 | B | none | none |
 | C | 11, 12, 13, 14, 15, 16, 17 Nov | 17 Nov |
 | D | 11, 12, 13, 15, 17, 21 Nov | 21 Nov |
@@ -213,9 +236,9 @@ The team has 8 so far, with none on 18–20 Nov. A review on 22 Nov cannot reach
 
 ### Action items before the Mid Review
 
-- **A:** Build `node.py`, `config.py` and `scripts/launch_mesh.py`, committing daily. Merge every branch into `main` (still untouched since 11 Nov).
+- **A:** Week 2 code is done. Merge every branch into `main` (still untouched since 11 Nov) and commit daily.
 - **B:** Start the UDP ping/pong transport now; C, D and E all depend on it.
-- **C:** Move the files to `meshweaver/dht/` so the tests run; start the Kademlia RPCs on top of `meshweaver.protocol`.
+- **C:** Move the files to `meshweaver/dht/` so the tests run; build the Kademlia RPCs as a `Module` (see `meshweaver/membership.py` for the shape) to replace the placeholder.
 - **D:** Fill `broadcast.py` and `peer_store.py` (5 s gossip loop, 15 s staleness). Reuse C's `dht.node_id` instead of a second copy in `peer_register.py`, and send load as `protocol.LoadReport`.
 - **E:** Start the `cloudpickle` serializer. No commits yet.
 - **B and E:** Reply in the team channel. Over 48 hours of silence must be reported to Infotact.

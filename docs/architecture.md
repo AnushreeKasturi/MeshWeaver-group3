@@ -153,17 +153,99 @@ If X misses 3 heartbeats from Y, E marks the task `failed`, asks D's scheduler
 for another peer (skipping Y) and resends it as `re-routed`. The task ID in the
 DHT guarantees the task is never run twice.
 
-## 6. Startup and shutdown order (node runtime, Week 2)
+## 6. Node runtime (`meshweaver/node.py`)
 
-1. Load config (ports, gossip interval 5 s, stale after 15 s, heartbeat 2 s).
-2. Generate the node ID, create the `Dispatcher`.
-3. Start the transport (B) and install its reply hook.
-4. Start the DHT (C) and bootstrap; register its handlers.
-5. Start gossip (D) and the scheduler (D); register handlers.
-6. Start tasks (E); register handlers.
-7. Check `dispatcher.missing_handlers()` is empty.
+### The Module interface
 
-Shutdown cancels the background tasks in reverse order and closes sockets last.
+Every part of a node is a `Module` subclass. This is what B, C, D and E
+implement so the runtime can run their code:
+
+```python
+from meshweaver.node import Module
+from meshweaver.protocol import MessageType
+
+class Gossip(Module):
+    name = "gossip"
+
+    def handlers(self):                     # registered before start()
+        return {MessageType.GOSSIP_LOAD: self.on_load}
+
+    async def start(self):                  # return quickly
+        self.spawn(self._loop(), name="broadcast")   # cancelled on shutdown
+
+    async def _loop(self):
+        while True:
+            for peer in self.node.module("membership").peer_list()[:3]:
+                self.node.send(peer.address, MessageType.GOSSIP_LOAD, report)
+            self.log.event("gossip.send", peers=3)
+            await asyncio.sleep(self.node.config.gossip_interval)
+
+    async def stop(self):                   # optional: flush state
+        ...
+```
+
+Inside a module: `self.node.config` (settings), `self.node.id_hex`,
+`self.node.send(addr, type, payload)`, `await self.node.request(addr, type,
+payload)`, `self.node.module("name")` (another module), `self.log.event(...)`.
+
+### Startup
+
+1. Load config: defaults, then JSON file, then `MESHWEAVER_*` env vars, then CLI flags.
+2. Derive the 160-bit node ID (SHA-1 of the name, or random) and create the `Dispatcher`.
+3. Start the transport; it installs the dispatcher's reply hook.
+4. For each module in order (membership/DHT, gossip, scheduler, tasks):
+   register its handlers, then `await module.start()`.
+5. Log any request types still without a handler (`node.unhandled`).
+
+If any module fails to start, the modules already running are stopped again.
+
+### Shutdown
+
+Modules stop in reverse order. For each one: `stop()` runs (with a timeout),
+then every task it started with `spawn()` is cancelled and awaited, then its
+handlers are removed. The transport closes last and fails any requests still
+waiting for a reply. A background task that crashes is logged and does not
+take the node down.
+
+### Transport and membership placeholders
+
+`meshweaver/transport.py` defines the `Transport` interface (`start`, `send`,
+`request`, `close`) and a minimal `UdpTransport`. `meshweaver/membership.py`
+does basic peer discovery with PING and FIND_NODE. Both exist so the runtime,
+the launcher and the integration tests work now. B's `net/` transport and C's
+Kademlia DHT replace them using the same interface and message types, so no
+other code changes.
+
+On Windows, `UdpTransport` disables `SIO_UDP_CONNRESET`. Without that, a few
+datagrams sent to a dead node make Windows stop delivering packets to the
+socket, and the node goes deaf exactly when a peer dies.
+
+### Configuration (`meshweaver/config.py`)
+
+| Setting | Default | Used by |
+|---|---|---|
+| `host`, `port`, `seeds` | `127.0.0.1`, `9000`, none | runtime |
+| `max_message_size`, `rpc_timeout` | 60 000 B, 2 s | transport |
+| `k`, `peer_refresh_interval`, `peer_max_misses` | 20, 2 s, 3 | membership / DHT |
+| `gossip_interval`, `gossip_fanout`, `stale_after` | 5 s, 3, 15 s | gossip |
+| `heartbeat_interval`, `heartbeat_max_misses`, `task_timeout` | 2 s, 3, 60 s | tasks |
+| `log_level`, `log_json`, `log_file` | INFO, off, none | logging |
+
+### Structured logging (`meshweaver/logs.py`)
+
+Modules log named events with fields (`self.log.event("peer.join", peer=...)`).
+Events include `node.start`, `node.ready`, `node.stop`, `module.start`,
+`module.stop`, `peer.join`, `peer.leave`, `gossip.send`, `gossip.recv` and
+`task.*`. Output is readable text by default, or JSON lines with `--log-json`
+for filtering a 10-node run.
+
+### Launcher (`scripts/launch_mesh.py`)
+
+Starts N node processes (default 10) on consecutive ports, with node 0 as the
+seed. Once a second it asks every node for its peer list and prints a table,
+then reports how long the mesh took to form. Each node logs to
+`logs/node-<i>.log`. Killing any node process shows the rest dropping it
+within about three refresh intervals.
 
 ## 7. Repository and branches
 
