@@ -178,9 +178,45 @@ Commit small, working pieces every day.
 
 ## Progress
 
-| Week | A | B | C | D | E |
+_Last checked: 21 Nov 2026 (Week 3). ✅ done · 🟡 partial · ⬜ not started_
+
+| Week | A (`member-a`) | B (`member-b`) | C (`member--c`) | D (`member---d`) | E (`member--e`) |
 |---|---|---|---|---|---|
-| 1 | ✅ Protocol, dispatcher (30 tests), architecture doc, skeleton | ⬜ | ✅ Node IDs, k-buckets, routing table, tests | ✅ Load collector, gossip message, tests | ⬜ |
-| 2 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1 | ✅ Protocol, dispatcher, architecture doc, skeleton | ⬜ No commits | ✅ Node IDs, XOR distance, k-buckets, routing table | ✅ Load collector, gossip message format | ⬜ No commits |
+| 2 | ⬜ Node runtime, config, launcher not started | ⬜ | ⬜ README updates only; no RPCs, lookup or bootstrap yet | 🟡 3-nearest-neighbour selection; `broadcast.py` and `peer_store.py` empty; no 5 s gossip loop or stale check | ⬜ |
 | 3 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+
+### Tests on each branch
+
+| Branch | Result |
+|---|---|
+| `member-a` | ✅ 30 passed (`tests/unit/test_protocol.py`) |
+| `member--c` | ❌ 3 import errors: the code sits in `dht/__init__.py/node_id.py/bucket.py/` instead of `dht/`. Moved to `meshweaver/dht/`, all 25 tests pass. |
+| `member---d` | ✅ 12 passed (`collector_unit_test.py`, `protocol_unit_test.py`, `test_gossip_week1.py`) |
+| `member-b`, `member--e` | No code yet |
+
+### Commit days
+
+| Member | Days with commits | Last commit |
+|---|---|---|
+| A | 13 Nov | 13 Nov |
+| B | none | none |
+| C | 11, 12, 13, 14, 15, 16, 17 Nov | 17 Nov |
+| D | 11, 12, 13, 15, 17, 21 Nov | 21 Nov |
+| E | none | none |
+| **Team** | **11–17, 21 Nov (8 days)** | |
+
+**Mid Review (20–27 Nov) needs 10 commit days in the 14 days before it.**
+The team has 8 so far, with none on 18–20 Nov. A review on 22 Nov cannot reach
+10. A review on 27 Nov needs commits on at least 5 of 22–27 Nov.
+
+### Action items before the Mid Review
+
+- **A:** Build `node.py`, `config.py` and `scripts/launch_mesh.py`, committing daily. Merge every branch into `main` (still untouched since 11 Nov).
+- **B:** Start the UDP ping/pong transport now; C, D and E all depend on it.
+- **C:** Move the files to `meshweaver/dht/` so the tests run; start the Kademlia RPCs on top of `meshweaver.protocol`.
+- **D:** Fill `broadcast.py` and `peer_store.py` (5 s gossip loop, 15 s staleness). Reuse C's `dht.node_id` instead of a second copy in `peer_register.py`, and send load as `protocol.LoadReport`.
+- **E:** Start the `cloudpickle` serializer. No commits yet.
+- **B and E:** Reply in the team channel. Over 48 hours of silence must be reported to Infotact.
+- **Branch names:** C, D and E's branches are `member--c`, `member---d` and `member--e`, not `member-c`/`-d`/`-e` as planned. Keep them as they are so the dashboard links stay valid.
