@@ -1,7 +1,6 @@
-
 from unittest.mock import patch, Mock
 
-from meshweaver.gossip.collector import collect_system_load
+from gossip.collector import collect_system_load
 
 
 def test_collect_system_load():
@@ -10,10 +9,10 @@ def test_collect_system_load():
     fake_memory.available = 3 * (1024 ** 3)
 
     with patch(
-        "meshweaver.gossip.collector.psutil.cpu_percent",
+        "gossip.collector.psutil.cpu_percent",
         return_value=25.5
     ), patch(
-        "meshweaver.gossip.collector.psutil.virtual_memory",
+        "gossip.collector.psutil.virtual_memory",
         return_value=fake_memory
     ):
         result = collect_system_load()
