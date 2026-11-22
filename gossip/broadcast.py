@@ -78,14 +78,15 @@ class GossipModule(Module):
             free_ram_gb=load_info["free_ram_gb"],
         )
 
-        membership = self.node.module("membership")
-
-        if membership is None:
-            self.log.event(
-                "gossip.warning",
-                detail="Membership module not available",
-            )
-            return
+      try:
+          membership = self.node.module("membership")
+      except KeyError:
+          self.log.event(
+                       "gossip.warning",
+                      detail="Membership module not available",
+          )
+          return
+          
 
         connected_peers = membership.peer_list()
 
