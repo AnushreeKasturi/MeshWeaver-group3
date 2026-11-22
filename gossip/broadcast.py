@@ -1,3 +1,4 @@
+
 """Gossip broadcasting and receiving module."""
 
 import asyncio
@@ -20,7 +21,6 @@ class GossipModule(Module):
 
     def __init__(self):
         super().__init__()
-
         self.peer_store = PeerLoadStore()
 
     def handlers(self):
@@ -46,10 +46,8 @@ class GossipModule(Module):
         """Periodically broadcast local system load."""
 
         while True:
-
             try:
                 await self.broadcast_load()
-
                 self.peer_store.remove_stale_peers()
 
             except asyncio.CancelledError:
@@ -78,15 +76,15 @@ class GossipModule(Module):
             free_ram_gb=load_info["free_ram_gb"],
         )
 
-      try:
-          membership = self.node.module("membership")
-      except KeyError:
-          self.log.event(
-                       "gossip.warning",
-                      detail="Membership module not available",
-          )
-          return
-          
+        try:
+            membership = self.node.module("membership")
+
+        except KeyError:
+            self.log.event(
+                "gossip.warning",
+                detail="Membership module not available",
+            )
+            return
 
         connected_peers = membership.peer_list()
 
@@ -99,7 +97,6 @@ class GossipModule(Module):
         sent_count = 0
 
         for peer in nearest_peers:
-
             self.node.send(
                 peer.address,
                 MessageType.GOSSIP_LOAD,
