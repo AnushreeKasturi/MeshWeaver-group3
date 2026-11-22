@@ -1,5 +1,4 @@
-
-from meshweaver.gossip.protocol import (
+from gossip.protocol import (
     create_gossip_message,
     GossipMessage,
 )
@@ -20,3 +19,4 @@ def test_create_gossip_message():
     assert message.node_id == "a" * 40
     assert message.cpu_usage == 25.5
     assert message.free_ram_gb == 3.0
+    assert message.timestamp > 0
