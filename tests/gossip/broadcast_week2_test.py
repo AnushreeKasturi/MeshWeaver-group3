@@ -1,9 +1,8 @@
-
 import asyncio
 import time
 from unittest.mock import Mock
 
-from meshweaver.gossip.broadcast import GossipModule
+from gossip.broadcast import GossipModule
 from meshweaver.protocol import LoadReport
 
 
@@ -35,10 +34,12 @@ def test_gossip_module_receives_message():
 
     gossip.log = Mock()
 
-    asyncio.run(gossip.on_load(
-        fake_message,
-        ("127.0.0.1", 8001)
-    ))
+    asyncio.run(
+        gossip.on_load(
+            fake_message,
+            ("127.0.0.1", 8001)
+        )
+    )
 
     received = gossip.get_peer_loads()
 
