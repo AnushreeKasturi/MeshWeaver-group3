@@ -1,4 +1,4 @@
-# Week 2 – Gossip Protocol
+## Week 2 – Gossip Protocol
 
 ## Overview
 Week 2 focuses on implementing Gossip broadcasting and receiving functionality in the MeshWeaver distributed system.
