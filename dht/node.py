@@ -1,22 +1,17 @@
 
-"""MeshWeaver DHT module.
-
-Uses Member A's shared Node, Module and protocol architecture.
-"""
+"""MeshWeaver Distributed Hash Table module."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from ..node import Module
+
 from ..protocol import (
     MessageType,
     PeerInfo,
-    FindNode,
     FindNodeReply,
-    FindValue,
     FindValueReply,
-    Store,
     StoreReply,
     node_id_to_hex,
     node_id_from_hex,
@@ -24,6 +19,9 @@ from ..protocol import (
 
 from .routing_table import RoutingTable
 from .node_id import generate_node_id
+from .lookup import iterative_find_node
+from .rpc import request_store, request_find_value
+from .bootstrap import bootstrap, refresh_loop
 
 
 class DHT(Module):
@@ -36,14 +34,15 @@ class DHT(Module):
 
         self.routing_table = None
 
-        # Maps integer node IDs to (host, port).
+        # Integer peer ID -> (host, port)
         self.peer_addresses: dict[int, tuple[str, int]] = {}
 
-        # Locally stored key-value data.
+        # Locally stored key-value data
         self.data_store: dict[str, Any] = {}
 
     def handlers(self):
-        """Register DHT request handlers."""
+        """Register DHT message handlers."""
+
         return {
             MessageType.FIND_NODE: self.on_find_node,
             MessageType.STORE: self.on_store,
@@ -51,19 +50,30 @@ class DHT(Module):
         }
 
     async def start(self):
-        """Initialize the routing table after the module is attached."""
+        """Initialize the DHT after runtime attaches this module."""
+
         self.routing_table = RoutingTable(self.node.node_id)
 
+        self.spawn(
+            bootstrap(self),
+            name="dht-bootstrap",
+        )
+
+        self.spawn(
+            refresh_loop(self),
+            name="dht-refresh",
+        )
+
     async def stop(self):
-        """Stop DHT background work if added later."""
+        """No separate server needs to be stopped here."""
         pass
 
-    # -------------------------------------------------
+    # -----------------------------------------
     # PEER MANAGEMENT
-    # -------------------------------------------------
+    # -----------------------------------------
 
     def add_peer(self, peer: PeerInfo) -> bool:
-        """Add a peer using Member A's PeerInfo format."""
+        """Add a peer to the routing table."""
 
         peer_id = node_id_from_hex(peer.node_id)
 
@@ -80,26 +90,35 @@ class DHT(Module):
 
         return added
 
+    def remove_peer(self, peer_id: int) -> bool:
+        """Remove a peer and its network address."""
+
+        removed = self.routing_table.remove_peer(peer_id)
+
+        if removed:
+            self.peer_addresses.pop(peer_id, None)
+
+        return removed
+
     def get_nearest_peer_infos(
         self,
         target_id: int,
         count: int | None = None,
     ) -> list[PeerInfo]:
-        """Return the closest known peers to a target ID."""
+        """Return peers ordered by XOR distance."""
 
         if count is None:
             count = self.node.config.k
 
         peer_ids = self.routing_table.get_all_peers()
 
-        nearest = sorted(
-            peer_ids,
-            key=lambda peer_id: peer_id ^ target_id,
-        )[:count]
+        peer_ids.sort(
+            key=lambda peer_id: peer_id ^ target_id
+        )
 
         result = []
 
-        for peer_id in nearest:
+        for peer_id in peer_ids[:count]:
             address = self.peer_addresses.get(peer_id)
 
             if address is None:
@@ -117,14 +136,15 @@ class DHT(Module):
 
         return result
 
-    # -------------------------------------------------
-    # FIND_NODE
-    # -------------------------------------------------
+    # -----------------------------------------
+    # FIND_NODE HANDLER
+    # -----------------------------------------
 
     async def on_find_node(self, msg, addr):
-        """Respond with the closest known peers."""
+        """Return the closest known peers."""
 
         request = msg.parsed()
+
         target_id = node_id_from_hex(request.target_id)
 
         peers = self.get_nearest_peer_infos(target_id)
@@ -135,9 +155,9 @@ class DHT(Module):
             FindNodeReply.from_peers(peers),
         )
 
-    # -------------------------------------------------
-    # STORE
-    # -------------------------------------------------
+    # -----------------------------------------
+    # STORE HANDLER
+    # -----------------------------------------
 
     async def on_store(self, msg, addr):
         """Store a key-value pair locally."""
@@ -152,12 +172,12 @@ class DHT(Module):
             StoreReply(ok=True),
         )
 
-    # -------------------------------------------------
-    # FIND_VALUE
-    # -------------------------------------------------
+    # -----------------------------------------
+    # FIND_VALUE HANDLER
+    # -----------------------------------------
 
     async def on_find_value(self, msg, addr):
-        """Return a value or nearby peers."""
+        """Return a stored value or nearby peers."""
 
         request = msg.parsed()
 
@@ -166,6 +186,7 @@ class DHT(Module):
                 found=True,
                 value=self.data_store[request.key],
             )
+
         else:
             target_id = generate_node_id(request.key)
 
@@ -180,9 +201,88 @@ class DHT(Module):
             response,
         )
 
+    # -----------------------------------------
+    # PUBLIC DHT OPERATIONS
+    # -----------------------------------------
 
-        
+    async def find_node(self, target_id: int):
+        """Find the closest peers to a target ID."""
 
-        
+        return await iterative_find_node(
+            self,
+            target_id,
+        )
 
+    async def store_value(self, key: str, value: Any):
+        """Store locally and replicate to closest peers."""
+
+        self.data_store[key] = value
+
+        target_id = generate_node_id(key)
+
+        peers = await self.find_node(target_id)
+
+        results = []
+
+        for peer_id in peers:
+            if peer_id not in self.peer_addresses:
+                continue
+
+            try:
+                stored = await request_store(
+                    self,
+                    peer_id,
+                    key,
+                    value,
+                )
+                results.append(stored)
+
+            except Exception as error:
+                self.log.warning(
+                    "STORE failed for peer %s: %s",
+                    peer_id,
+                    error,
+                )
+                results.append(False)
+
+        return all(results) if results else True
+
+    async def find_value(self, key: str):
+        """Find a value locally or on remote peers."""
+
+        if key in self.data_store:
+            return self.data_store[key]
+
+        target_id = generate_node_id(key)
+
+        peers = await self.find_node(target_id)
+
+        for peer_id in peers:
+            try:
+                value = await request_find_value(
+                    self,
+                    peer_id,
+                    key,
+                )
+
+                if value is not None:
+                    self.data_store[key] = value
+                    return value
+
+            except Exception as error:
+                self.log.warning(
+                    "FIND_VALUE failed for peer %s: %s",
+                    peer_id,
+                    error,
+                )
+
+        return None
+
+
+
+     
+       
+
+
+     
              
