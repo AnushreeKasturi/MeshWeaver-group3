@@ -1,78 +1,82 @@
-from net.message import create_message
-from net.transport import send_rpc
+
+"""Remote procedure calls for the MeshWeaver DHT."""
+
+from ..protocol import (
+    MessageType,
+    FindNode,
+    FindNodeReply,
+    FindValue,
+    FindValueReply,
+    Store,
+    StoreReply,
+    node_id_to_hex,
+)
 
 
-def create_rpc_payload(node_info, extra=None):
+async def request_find_node(dht, peer_id: int, target_id: int):
+    """Request the closest peers to a target node ID."""
 
-    payload = {
-        "sender": {
-            "node_id": node_info["node_id"],
-            "ip_address": node_info["ip_address"],
-            "port": node_info["port"]
-        }
-    }
+    address = dht.peer_addresses.get(peer_id)
 
-    if extra:
-        payload.update(extra)
+    if address is None:
+        return []
 
-    return payload
-
-
-async def ping(peer, local_node):
-
-    message = create_message(
-        "PING",
-        local_node["node_id"],
-        create_rpc_payload(local_node)
+    response = await dht.node.request(
+        address,
+        MessageType.FIND_NODE,
+        FindNode(target_id=node_id_to_hex(target_id)),
+        timeout=dht.node.config.rpc_timeout,
     )
 
-    return await send_rpc(peer, message)
+    result = response.parsed()
+
+    if not isinstance(result, FindNodeReply):
+        return []
+
+    return result.peer_infos()
 
 
-async def store(peer, local_node, key, value):
+async def request_store(dht, peer_id: int, key: str, value):
+    """Store a key-value pair on a remote peer."""
 
-    message = create_message(
-        "STORE",
-        local_node["node_id"],
-        create_rpc_payload(
-            local_node,
-            {
-                "key": key,
-                "value": value
-            }
-        )
+    address = dht.peer_addresses.get(peer_id)
+
+    if address is None:
+        return False
+
+    response = await dht.node.request(
+        address,
+        MessageType.STORE,
+        Store(key=key, value=value),
+        timeout=dht.node.config.rpc_timeout,
     )
 
-    return await send_rpc(peer, message)
+    result = response.parsed()
+
+    return isinstance(result, StoreReply) and result.ok
 
 
-async def find_node(peer, local_node, target_node_id):
+async def request_find_value(dht, peer_id: int, key: str):
+    """Request a value from a remote peer."""
 
-    message = create_message(
-        "FIND_NODE",
-        local_node["node_id"],
-        create_rpc_payload(
-            local_node,
-            {
-                "target_node_id": target_node_id
-            }
-        )
+    address = dht.peer_addresses.get(peer_id)
+
+    if address is None:
+        return None
+
+    response = await dht.node.request(
+        address,
+        MessageType.FIND_VALUE,
+        FindValue(key=key),
+        timeout=dht.node.config.rpc_timeout,
     )
 
-    return await send_rpc(peer, message)
+    result = response.parsed()
 
+    if not isinstance(result, FindValueReply):
+        return None
 
-async def find_value(peer, local_node, key):
+    if result.found:
+        return result.value
 
-    message = create_message(
-        "FIND_VALUE",
-        local_node["node_id"],
-        create_rpc_payload(
-            local_node,
-            {
-                "key": key
-            }
-        )
-    )
-
-    return await send_rpc(peer, message)
+    return None
