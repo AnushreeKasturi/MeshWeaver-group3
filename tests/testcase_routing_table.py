@@ -1,6 +1,6 @@
 import pytest
 
-from dht.routing_table import RoutingTable
+from meshweaver.dht.routing_table import RoutingTable
 
 
 def test_routing_table_creation():
