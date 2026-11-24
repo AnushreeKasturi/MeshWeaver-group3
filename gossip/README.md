@@ -1,19 +1,25 @@
-##Week 1: Load Collector and Gossip Protocol
 
-Developed Python modules to collect system CPU and RAM information and define gossip messages for sharing node load details.
+# Week 1 – System Load Collection and Gossip Message Creation
 
-##Files
+## Overview
+Week 1 focuses on collecting system resource information and creating Gossip messages for communication between MeshWeaver nodes.
 
-collector.py – Collects CPU and RAM usage.
+## Files and Description
 
-protocol.py – Creates and converts gossip messages to/from JSON.
+- **collector.py:** Collects CPU usage, total RAM, and free RAM using the `psutil` library.
+- **protocol.py:** Defines the Gossip message structure and provides functionality to create messages containing node load information.
 
-tests/ – Contains unit and integration tests.
+## Key Features
 
-##Technologies
+- Monitors CPU usage.
+- Collects total and available RAM information.
+- Creates Gossip messages containing node ID, CPU usage, free RAM, and timestamp.
+- Connects collected system information with the Gossip message structure.
 
-Python, psutil, JSON, unittest.
+## Testing
 
-Status
+Tests cover system load collection and Gossip message creation, including validation of the collected values and message fields.
 
-Week 1 tasks completed and tested.
+## Conclusion
+
+Week 1 establishes the basic system load monitoring and Gossip message creation functionality required for communication between MeshWeaver nodes.
