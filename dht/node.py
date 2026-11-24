@@ -1,4 +1,3 @@
-
 """MeshWeaver Distributed Hash Table module."""
 
 from __future__ import annotations
@@ -44,6 +43,7 @@ class DHT(Module):
         """Register DHT message handlers."""
 
         return {
+            MessageType.PING: self.on_ping,
             MessageType.FIND_NODE: self.on_find_node,
             MessageType.STORE: self.on_store,
             MessageType.FIND_VALUE: self.on_find_value,
@@ -100,6 +100,23 @@ class DHT(Module):
 
         return removed
 
+    def peer_list(self):
+        """Return peers in a format suitable for gossip integration."""
+
+        peers = []
+
+        for peer_id, address in self.peer_addresses.items():
+            host, port = address
+
+            peers.append(
+                {
+                    "node_id": node_id_to_hex(peer_id),
+                    "address": (host, port),
+                }
+            )
+
+        return peers
+
     def get_nearest_peer_infos(
         self,
         target_id: int,
@@ -137,11 +154,41 @@ class DHT(Module):
         return result
 
     # -----------------------------------------
+    # PING HANDLER
+    # -----------------------------------------
+
+    async def on_ping(self, msg, addr):
+        """Handle PING requests and reply with PONG."""
+
+        self.add_peer(
+            PeerInfo(
+                msg.sender_id,
+                addr[0],
+                addr[1],
+            )
+        )
+
+        return msg.reply(
+            MessageType.PONG,
+            self.node.id_hex,
+            None,
+        )
+
+    # -----------------------------------------
     # FIND_NODE HANDLER
     # -----------------------------------------
 
     async def on_find_node(self, msg, addr):
         """Return the closest known peers."""
+
+        # Learn about the requesting peer.
+        self.add_peer(
+            PeerInfo(
+                msg.sender_id,
+                addr[0],
+                addr[1],
+            )
+        )
 
         request = msg.parsed()
 
@@ -162,6 +209,15 @@ class DHT(Module):
     async def on_store(self, msg, addr):
         """Store a key-value pair locally."""
 
+        # Learn about the requesting peer.
+        self.add_peer(
+            PeerInfo(
+                msg.sender_id,
+                addr[0],
+                addr[1],
+            )
+        )
+
         request = msg.parsed()
 
         self.data_store[request.key] = request.value
@@ -178,6 +234,15 @@ class DHT(Module):
 
     async def on_find_value(self, msg, addr):
         """Return a stored value or nearby peers."""
+
+        # Learn about the requesting peer.
+        self.add_peer(
+            PeerInfo(
+                msg.sender_id,
+                addr[0],
+                addr[1],
+            )
+        )
 
         request = msg.parsed()
 
@@ -235,6 +300,7 @@ class DHT(Module):
                     key,
                     value,
                 )
+
                 results.append(stored)
 
             except Exception as error:
@@ -243,6 +309,7 @@ class DHT(Module):
                     peer_id,
                     error,
                 )
+
                 results.append(False)
 
         return all(results) if results else True
@@ -278,9 +345,13 @@ class DHT(Module):
 
         return None
 
-
-
      
+
+   
+
+
+   
+    
        
 
 
