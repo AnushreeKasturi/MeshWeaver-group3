@@ -1,4 +1,4 @@
-from dht.bucket import KBucket, K
+from meshweaver.dht.bucket import KBucket, K
 
 
 def test_add_peer():
