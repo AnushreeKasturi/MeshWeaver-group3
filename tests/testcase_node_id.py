@@ -1,4 +1,4 @@
-from dht.node_id import (
+from meshweaver.dht.node_id import (
     generate_node_id,
     xor_distance,
     get_bucket_index,
