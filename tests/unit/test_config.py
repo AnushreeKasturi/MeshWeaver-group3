@@ -85,3 +85,33 @@ def test_replace_and_round_trip():
     d = c.replace(port=9005, name=None)
     assert d.port == 9005 and d.name == "a"
     assert NodeConfig.from_dict(c.to_dict()) == c
+
+
+def test_multicast_is_off_by_default_and_seeds_still_work():
+    c = NodeConfig(seeds=["127.0.0.1:9000"])
+    assert c.multicast_enabled is False
+    assert c.multicast_group == "239.255.42.99"
+    assert c.multicast_port == 9999
+    assert c.multicast_interval == 5.0
+    assert c.seeds == [("127.0.0.1", 9000)]
+
+
+def test_multicast_settings_from_env_and_overrides():
+    env = {"MESHWEAVER_MULTICAST_ENABLED": "true",
+           "MESHWEAVER_MULTICAST_GROUP": "239.1.2.3",
+           "MESHWEAVER_MULTICAST_PORT": "9998"}
+    c = load_config(env=env, multicast_interval=2.0)
+    assert c.multicast_enabled is True
+    assert (c.multicast_group, c.multicast_port, c.multicast_interval) == ("239.1.2.3", 9998, 2.0)
+
+
+@pytest.mark.parametrize("changes", [
+    {"multicast_group": "192.168.1.10"},   # a normal address, not multicast
+    {"multicast_group": "not-an-ip"},
+    {"multicast_port": 0},
+    {"multicast_port": 70000},
+    {"multicast_interval": 0},
+])
+def test_multicast_validation(changes):
+    with pytest.raises(ValueError):
+        NodeConfig(**changes)

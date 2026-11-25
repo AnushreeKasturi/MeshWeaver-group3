@@ -260,6 +260,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, help="UDP port (default 9000, 0 = any free port)")
     p.add_argument("--seed", action="append", default=None, metavar="HOST:PORT",
                    help="existing node to join through (repeatable)")
+    p.add_argument("--multicast", action="store_true", default=None,
+                   help="also discover peers by UDP multicast on the local network")
     p.add_argument("--config", help="JSON config file")
     p.add_argument("--log-level", help="DEBUG, INFO, WARNING or ERROR")
     p.add_argument("--log-json", action="store_true", default=None,
@@ -273,6 +275,7 @@ def config_from_args(argv: Optional[Iterable[str]] = None) -> NodeConfig:
     seeds = [parse_address(s) for s in args.seed] if args.seed else None
     return load_config(
         args.config, name=args.name, host=args.host, port=args.port, seeds=seeds,
+        multicast_enabled=args.multicast,
         log_level=args.log_level, log_json=args.log_json, log_file=args.log_file,
     )
 

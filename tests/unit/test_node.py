@@ -221,3 +221,8 @@ def test_cli_args_build_config():
                           "--seed", "127.0.0.1:9000", "--seed", "9001", "--log-json"])
     assert c.name == "node-2" and c.port == 9002 and c.log_json is True
     assert c.seeds == [("127.0.0.1", 9000), ("127.0.0.1", 9001)]
+
+
+def test_cli_multicast_flag():
+    assert config_from_args(["--multicast"]).multicast_enabled is True
+    assert config_from_args([]).multicast_enabled is False

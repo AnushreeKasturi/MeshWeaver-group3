@@ -13,6 +13,7 @@ creates, so intervals and timeouts are changed in a single place.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 from dataclasses import asdict, dataclass, field, fields
@@ -56,6 +57,14 @@ class NodeConfig:
     peer_refresh_interval: float = 2.0   # seconds between peer pings
     peer_max_misses: int = 3             # missed pings before a peer is dropped
 
+    # Optional multicast discovery (member C). Off by default; when on it runs
+    # alongside seed bootstrap, so nodes on one LAN find each other with no
+    # hard-coded addresses.
+    multicast_enabled: bool = False
+    multicast_group: str = "239.255.42.99"   # administratively scoped (local) range
+    multicast_port: int = 9999               # separate from the node's own port
+    multicast_interval: float = 5.0          # seconds between announcements
+
     # Gossip and routing (member D)
     gossip_interval: float = 5.0         # seconds between load broadcasts
     gossip_fanout: int = 3               # nearest neighbours to gossip to
@@ -83,13 +92,22 @@ class NodeConfig:
             "max_message_size", "rpc_timeout", "k", "peer_refresh_interval",
             "peer_max_misses", "gossip_interval", "gossip_fanout", "stale_after",
             "heartbeat_interval", "heartbeat_max_misses", "task_timeout",
-            "shutdown_timeout",
+            "shutdown_timeout", "multicast_interval",
         )
         for name in positive:
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive, got {getattr(self, name)}")
         if self.stale_after <= self.gossip_interval:
             raise ValueError("stale_after must be longer than gossip_interval")
+        if not 0 < self.multicast_port < 65536:
+            raise ValueError(f"multicast_port out of range: {self.multicast_port}")
+        try:
+            group = ipaddress.ip_address(self.multicast_group)
+        except ValueError:
+            raise ValueError(f"multicast_group is not an IP address: {self.multicast_group!r}") from None
+        if not group.is_multicast:
+            raise ValueError(f"multicast_group {self.multicast_group} is not a multicast address "
+                             "(IPv4 multicast is 224.0.0.0-239.255.255.255)")
         if self.log_level.upper() not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError(f"unknown log level {self.log_level!r}")
 
