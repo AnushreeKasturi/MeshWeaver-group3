@@ -48,9 +48,11 @@ All modules talk through one shared message format and dispatcher in
 |---|---|---|---|
 | **A**: Sai Anushree Kasturi (Team Lead) | System architect: protocol, node runtime, integration, CLI, dashboard | `protocol.py`, `node.py`, `config.py`, `cli.py`, `dashboard.py`, `scripts/`, `tests/integration/` | `member-a` |
 | **B** | Networking core and TLS security | `meshweaver/net/` | `member-b` |
-| **C** | Kademlia DHT and peer discovery | `meshweaver/dht/` | `member--c` |
-| **D** | Gossip protocol and task routing | `meshweaver/gossip/`, `meshweaver/scheduler/` | `member---d` |
+| **C**: Marimganti Lakshmi Sahana | Kademlia DHT and peer discovery | `meshweaver/dht/` | `member--c` |
+| **D**: PadmaSrivalli Bathula | Gossip protocol and task routing | `gossip/`, `meshweaver/scheduler/` | `member---d` |
 | **E** | Task serialization, execution and fault tolerance | `meshweaver/tasks/` | `member--e` |
+
+B and E have not been confirmed on the roster and have made no commits.
 
 ## Repository layout
 
@@ -62,17 +64,19 @@ MeshWeaver-group3/
 │   ├── config.py        # A: ports, intervals, timeouts
 │   ├── logs.py          # A: structured event logging
 │   ├── transport.py     # A: Transport interface + minimal UDP (until B's net/ lands)
-│   ├── membership.py    # A: basic peer discovery (until C's DHT lands)
+│   ├── membership.py    # A: placeholder peer discovery, being replaced by dht/
 │   ├── cli.py           # A: `meshweaver start` / `submit` (Week 4)
 │   ├── dashboard.py     # A: live rich dashboard (Week 4)
 │   ├── net/             # B: UDP/TCP transport, TLS
-│   ├── dht/             # C: node IDs, k-buckets, lookups, bootstrap
-│   ├── gossip/          # D: load collector and gossip
-│   ├── scheduler/       # D: least-loaded routing
+│   ├── dht/             # C: node IDs, k-buckets, RPCs, iterative lookup, bootstrap
+│   ├── scheduler/       # D: least-loaded routing (Week 3)
 │   └── tasks/           # E: serializer, executor, heartbeats
+├── gossip/              # D: load collector, peer load store, GossipModule
 ├── tests/
-│   ├── unit/            # one test file per module
-│   └── integration/     # A: end-to-end task path
+│   ├── unit/            # A: protocol, config, logging, node runtime
+│   ├── gossip/          # D: gossip tests
+│   ├── testcase_*.py    # C: DHT tests
+│   └── integration/     # A: 10-node mesh and (Week 3) end-to-end task path
 ├── scripts/
 │   └── launch_mesh.py   # A: start 10 nodes on one machine
 ├── docs/
@@ -201,45 +205,51 @@ Commit small, working pieces every day.
 
 ## Progress
 
-_Last checked: 21 Nov 2026 (Week 3). ✅ done · 🟡 partial · ⬜ not started_
+_Last checked: 25 Nov 2026 (end of Week 3). ✅ done · 🟡 partial · ⬜ not started_
 
 | Week | A (`member-a`) | B (`member-b`) | C (`member--c`) | D (`member---d`) | E (`member--e`) |
 |---|---|---|---|---|---|
 | 1 | ✅ Protocol, dispatcher, architecture doc, skeleton | ⬜ No commits | ✅ Node IDs, XOR distance, k-buckets, routing table | ✅ Load collector, gossip message format | ⬜ No commits |
-| 2 | ✅ Node runtime, config, structured logging, 10-node launcher, placeholder transport and peer discovery; merge into `main` pending | ⬜ | ⬜ README updates only; no RPCs, lookup or bootstrap yet | 🟡 3-nearest-neighbour selection; `broadcast.py` and `peer_store.py` empty; no 5 s gossip loop or stale check | ⬜ |
-| 3 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 2 | ✅ Node runtime, config, structured logging, 10-node launcher, multicast settings, branches merged into `main` | ⬜ | ✅ PING / STORE / FIND_NODE / FIND_VALUE, iterative lookup (α = 3), seed bootstrap; multicast bootstrap in progress | ✅ `GossipModule`: load to 3 nearest every 5 s, peer load store, 15 s staleness | ⬜ |
+| 3 | ⬜ End-to-end task path, integration tests | ⬜ | ⬜ | ⬜ Router, offer/accept handshake | ⬜ |
 | 4 | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 
-### Tests on each branch
+### `main` branch
 
-| Branch | Result |
+`main` holds `member-a`, `member--c` and `member---d`, merged on 25 Nov (`8b67315`).
+
+| Check | Result |
 |---|---|
-| `member-a` | ✅ 71 passed (protocol, config, logging, node runtime, 10-node mesh integration tests) |
-| `member--c` | ❌ 3 import errors: the code sits in `dht/__init__.py/node_id.py/bucket.py/` instead of `dht/`. Moved to `meshweaver/dht/`, all 25 tests pass. |
-| `member---d` | ✅ 12 passed (`collector_unit_test.py`, `protocol_unit_test.py`, `test_gossip_week1.py`) |
-| `member-b`, `member--e` | No code yet |
+| All tests (`python -m pytest`) | 144 / 145 pass. The failure is `tests/testcase_node.py::test_find_node_handler`: the test reads `FindNodeReply.peers` as objects instead of calling `.peer_infos()`. |
+| `python scripts/launch_mesh.py` | Mesh formed in 2.0 s: every node knows all 9 others |
+| C's DHT in a live 10-node mesh | Every node finds all 9 others |
+| D's gossip in a live 10-node mesh | 30 load reports delivered (10 nodes × 3); a stopped node's load expires everywhere |
+
+**Next integration step:** nodes still start with the placeholder `Membership`.
+Switching `default_modules()` in `node.py` to C's `DHT` plus D's `GossipModule`
+needs D to look up the `"dht"` module instead of `"membership"` at the same time.
 
 ### Commit days
 
-| Member | Days with commits | Last commit |
+| Member | Days with commits (Nov) | Last commit |
 |---|---|---|
-| A | 13, 21 Nov | 21 Nov |
+| A | 13, 21, 22, 25 | 25 Nov |
 | B | none | none |
-| C | 11, 12, 13, 14, 15, 16, 17 Nov | 17 Nov |
-| D | 11, 12, 13, 15, 17, 21 Nov | 21 Nov |
+| C | 11–17, 21–24 | 24 Nov |
+| D | 11, 12, 13, 15, 17, 21–24 | 24 Nov |
 | E | none | none |
-| **Team** | **11–17, 21 Nov (8 days)** | |
+| **Team** | **11–17, 21–25 (12 days)** | |
 
 **Mid Review (20–27 Nov) needs 10 commit days in the 14 days before it.**
-The team has 8 so far, with none on 18–20 Nov. A review on 22 Nov cannot reach
-10. A review on 27 Nov needs commits on at least 5 of 22–27 Nov.
+A review on 25 or 26 Nov already meets it. For a review on 27 Nov the window is
+14–27 Nov, which has 9 days so far, so at least one commit is needed on 26 or 27 Nov.
+The Final Review needs a commit **every day** for the 20 days before it.
 
-### Action items before the Mid Review
+### Action items
 
-- **A:** Week 2 code is done. Merge every branch into `main` (still untouched since 11 Nov) and commit daily.
-- **B:** Start the UDP ping/pong transport now; C, D and E all depend on it.
-- **C:** Move the files to `meshweaver/dht/` so the tests run; build the Kademlia RPCs as a `Module` (see `meshweaver/membership.py` for the shape) to replace the placeholder.
-- **D:** Fill `broadcast.py` and `peer_store.py` (5 s gossip loop, 15 s staleness). Reuse C's `dht.node_id` instead of a second copy in `peer_register.py`, and send load as `protocol.LoadReport`.
-- **E:** Start the `cloudpickle` serializer. No commits yet.
-- **B and E:** Reply in the team channel. Over 48 hours of silence must be reported to Infotact.
-- **Branch names:** C, D and E's branches are `member--c`, `member---d` and `member--e`, not `member-c`/`-d`/`-e` as planned. Keep them as they are so the dashboard links stay valid.
+- **A:** Wire C's DHT and D's gossip into `default_modules()`; start the Week 3 end-to-end task path and integration tests.
+- **B:** No commits. The transport in `meshweaver/transport.py` is a placeholder until `net/` lands.
+- **C:** Fix `test_find_node_handler` (use `.peer_infos()`); finish multicast bootstrap using the `multicast_*` settings in `NodeConfig`; Week 3 bucket refresh, dead-peer removal and task records.
+- **D:** Change `node.module("membership")` to `node.module("dht")`; Week 3 router and offer/accept handshake.
+- **E:** No commits. Task execution blocks the Week 3 end-to-end path.
+- **B and E:** Over 48 hours without a reply must be reported to Infotact with screenshots, and their work reassigned to active members.
