@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import socket
@@ -276,7 +275,9 @@ def test_multicast_ignores_own_announcement(monkeypatch):
     "announcement",
     [
         b"not-json",
-        json.dumps({"host": "127.0.0.1", "port": 9104}).encode(),
+        json.dumps(
+            {"host": "127.0.0.1", "port": 9104}
+        ).encode(),
     ],
 )
 def test_multicast_ignores_invalid_announcement(
@@ -377,3 +378,24 @@ def test_multicast_socket_closed_after_stop(monkeypatch):
             )
 
     asyncio.run(run_test())
+
+
+def test_peer_list_returns_peer_objects():
+    """Peer list must expose node_id and address as object attributes."""
+
+    dht = DHT()
+
+    dht.peer_addresses[200] = ("127.0.0.1", 9001)
+
+    peers = dht.peer_list()
+
+    assert len(peers) == 1
+
+    peer = peers[0]
+
+    assert peer.node_id == node_id_to_hex(200)
+    assert peer.address == ("127.0.0.1", 9001)
+
+
+
+             
