@@ -95,6 +95,7 @@ class GossipModule(Module):
             self.node.node_id,
             connected_peers,
             self.node.config.gossip_fanout,
+            log=self.log,
         )
 
         sent_count = 0
