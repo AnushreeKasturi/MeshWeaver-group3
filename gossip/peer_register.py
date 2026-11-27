@@ -1,7 +1,13 @@
+
 """Select the nearest connected peers using Kademlia XOR distance."""
+
+import logging
 
 from meshweaver.protocol import node_id_from_hex
 from meshweaver.dht.node_id import xor_distance
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_nearest_neighbours(local_node_id, peers, count=3):
@@ -9,7 +15,7 @@ def get_nearest_neighbours(local_node_id, peers, count=3):
 
     Args:
         local_node_id: Local node ID as a 160-bit integer.
-        peers: Connected Peer objects from Membership.
+        peers: Connected Peer objects from DHT.
         count: Maximum number of neighbours to return.
     """
 
@@ -25,8 +31,16 @@ def get_nearest_neighbours(local_node_id, peers, count=3):
             if peer_id != local_node_id:
                 valid_peers.append(peer)
 
-        except (ValueError, AttributeError):
-            continue
+        except AttributeError:
+            logger.warning(
+                "Skipping peer: peer object does not have a node_id attribute"
+            )
+
+        except (ValueError, TypeError) as exc:
+            logger.warning(
+                "Skipping peer due to invalid node ID: %s",
+                exc,
+            )
 
     nearest = sorted(
         valid_peers,
