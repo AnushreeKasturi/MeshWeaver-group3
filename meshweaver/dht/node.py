@@ -1,9 +1,9 @@
-
 """MeshWeaver Distributed Hash Table module."""
 
 from __future__ import annotations
 
 from typing import Any
+from types import SimpleNamespace
 
 from ..node import Module
 
@@ -134,10 +134,10 @@ class DHT(Module):
             host, port = address
 
             peers.append(
-                {
-                    "node_id": node_id_to_hex(peer_id),
-                    "address": (host, port),
-                }
+                SimpleNamespace(
+                    node_id=node_id_to_hex(peer_id),
+                    address=(host, port),
+                )
             )
 
         return peers
@@ -369,11 +369,7 @@ class DHT(Module):
                 )
 
         return None
-
-
-
-
-  
+       
 
    
     
