@@ -1,5 +1,4 @@
- 
-import asyncio
+ import asyncio
 from types import SimpleNamespace
 
 from meshweaver.dht.node import DHT
@@ -229,5 +228,17 @@ def test_peer_list():
     peers = dht.peer_list()
 
     assert len(peers) == 1
-    assert peers[0]["node_id"] == node_id_to_hex(200)
-    assert peers[0]["address"] == ("127.0.0.1", 9001)
+    assert peers[0].node_id == node_id_to_hex(200)
+    assert peers[0].address == ("127.0.0.1", 9001)
+
+
+
+   
+   
+
+
+       
+
+  
+   
+   
