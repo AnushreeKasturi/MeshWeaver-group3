@@ -244,8 +244,9 @@ def default_modules(config: NodeConfig) -> list[Module]:
     DHT (C) replaces Membership, then gossip and scheduler (D), then tasks (E).
     """
     from .membership import Membership
+    from .tasks import Tasks
 
-    return [Membership()]
+    return [Membership(), Tasks()]
 
 
 # ---------------------------------------------------------------------------
