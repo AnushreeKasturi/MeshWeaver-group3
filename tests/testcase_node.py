@@ -207,7 +207,7 @@ def test_find_node_handler():
 
     returned_peer_ids = [
         int(peer.node_id, 16)
-        for peer in message.reply_payload.peers
+        for peer in message.reply_payload.peer_infos()
     ]
 
     assert 200 in returned_peer_ids
@@ -228,6 +228,17 @@ def test_peer_list():
     peers = dht.peer_list()
 
     assert len(peers) == 1
-    assert peers[0]["node_id"] == node_id_to_hex(200)
-    assert peers[0]["address"] == ("127.0.0.1", 9001)
+    assert peers[0].node_id == node_id_to_hex(200)
+    assert peers[0].address == ("127.0.0.1", 9001)
 
+
+
+   
+   
+
+
+       
+
+  
+   
+   

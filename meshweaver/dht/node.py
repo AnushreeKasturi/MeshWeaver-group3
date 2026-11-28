@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from types import SimpleNamespace
 
 from ..node import Module
 
@@ -20,7 +21,7 @@ from .routing_table import RoutingTable
 from .node_id import generate_node_id
 from .lookup import iterative_find_node
 from .rpc import request_store, request_find_value
-from .bootstrap import bootstrap, refresh_loop
+from .bootstrap import bootstrap, multicast_discovery, refresh_loop
 
 
 class DHT(Module):
@@ -39,6 +40,9 @@ class DHT(Module):
         # Locally stored key-value data
         self.data_store: dict[str, Any] = {}
 
+        # Separate UDP socket used for multicast discovery
+        self._multicast_socket = None
+
     def handlers(self):
         """Register DHT message handlers."""
 
@@ -50,23 +54,44 @@ class DHT(Module):
         }
 
     async def start(self):
-        """Initialize the DHT after runtime attaches this module."""
+        """Initialize DHT and start background discovery tasks."""
 
         self.routing_table = RoutingTable(self.node.node_id)
 
+        # Existing seed bootstrap
         self.spawn(
             bootstrap(self),
             name="dht-bootstrap",
         )
 
+        # Existing periodic peer refresh
         self.spawn(
             refresh_loop(self),
             name="dht-refresh",
         )
 
+        # Optional UDP multicast discovery
+        if self.node.config.multicast_enabled:
+            self.spawn(
+                multicast_discovery(self),
+                name="dht-multicast",
+            )
+
+            self.log.info("DHT multicast discovery enabled")
+
+        else:
+            self.log.info("DHT multicast discovery disabled")
+
     async def stop(self):
-        """No separate server needs to be stopped here."""
-        pass
+        """Close the multicast socket during shutdown."""
+
+        multicast_socket = self._multicast_socket
+
+        if multicast_socket is not None:
+            multicast_socket.close()
+            self._multicast_socket = None
+
+            self.log.info("DHT multicast socket closed")
 
     # -----------------------------------------
     # PEER MANAGEMENT
@@ -109,10 +134,10 @@ class DHT(Module):
             host, port = address
 
             peers.append(
-                {
-                    "node_id": node_id_to_hex(peer_id),
-                    "address": (host, port),
-                }
+                SimpleNamespace(
+                    node_id=node_id_to_hex(peer_id),
+                    address=(host, port),
+                )
             )
 
         return peers
@@ -344,11 +369,7 @@ class DHT(Module):
                 )
 
         return None
-
-     
-
-   
-
+       
 
    
     
