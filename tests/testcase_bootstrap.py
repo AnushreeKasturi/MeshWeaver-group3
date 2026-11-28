@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 import socket
@@ -395,6 +396,73 @@ def test_peer_list_returns_peer_objects():
 
     assert peer.node_id == node_id_to_hex(200)
     assert peer.address == ("127.0.0.1", 9001)
+
+
+def test_refresh_loop_retries_seed_when_seed_starts_late(monkeypatch):
+    """A node should discover its seed when the seed starts later."""
+
+    dht = make_dht()
+    seed_ready = False
+
+    async def fake_request(*args, **kwargs):
+        if not seed_ready:
+            raise ConnectionError("Seed is not running yet")
+
+        return SimpleNamespace(
+            sender_id=node_id_to_hex(200)
+        )
+
+    dht.node.request = fake_request
+
+    async def fake_lookup(dht_instance, target_id):
+        return []
+
+    monkeypatch.setattr(
+        bootstrap_module,
+        "iterative_find_node",
+        fake_lookup,
+    )
+
+    async def run_test():
+        nonlocal seed_ready
+
+        # First, bootstrap while the seed is offline.
+        await bootstrap_module.bootstrap(dht)
+
+        assert dht.routing_table.get_peer_count() == 0
+
+        # The seed starts after the node's initial bootstrap attempt.
+        seed_ready = True
+
+        sleep_calls = 0
+
+        async def fake_sleep(interval):
+            nonlocal sleep_calls
+
+            assert interval == 2.0
+            sleep_calls += 1
+
+            # Allow one refresh cycle to run.
+            if sleep_calls > 1:
+                raise asyncio.CancelledError
+
+        monkeypatch.setattr(
+            bootstrap_module.asyncio,
+            "sleep",
+            fake_sleep,
+        )
+
+        # Run refresh loop until the fake sleep cancels it.
+        try:
+            await bootstrap_module.refresh_loop(dht)
+        except asyncio.CancelledError:
+            pass
+
+        # The refresh loop should have discovered the late seed.
+        assert 200 in dht.routing_table.get_all_peers()
+        assert dht.peer_addresses[200] == ("127.0.0.1", 9001)
+
+    asyncio.run(run_test())
 
 
 
