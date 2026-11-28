@@ -1,0 +1,19 @@
+# MeshWeaver – Week 2 Work
+
+**Role:** Member C – Kademlia DHT and Peer Discovery
+
+## Work Completed
+- Implemented Kademlia RPC operations: PING, STORE, FIND_NODE and FIND_VALUE.
+- Worked on peer discovery and node communication.
+- Implemented node lookup functionality.
+- Integrated DHT operations with the networking module.
+- Tested the implemented functionalities.
+
+## Technologies Used
+- Python
+- Asyncio
+- Kademlia DHT
+
+## Outcome
+Completed the Week 2 implementation of DHT functionalities for peer communication, lookup and discovery.
+
