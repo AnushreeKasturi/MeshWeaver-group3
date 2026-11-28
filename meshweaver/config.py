@@ -52,7 +52,7 @@ class NodeConfig:
     max_message_size: int = 60_000       # bytes; larger payloads need TCP
     rpc_timeout: float = 2.0             # seconds to wait for a reply
 
-    # Membership / DHT (member C)
+    # DHT and peer discovery (member C)
     k: int = 20                          # k-bucket size and FIND_NODE reply size
     peer_refresh_interval: float = 2.0   # seconds between peer pings
     peer_max_misses: int = 3             # missed pings before a peer is dropped

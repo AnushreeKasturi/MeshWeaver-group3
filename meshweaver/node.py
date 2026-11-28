@@ -2,7 +2,7 @@
 
 A MeshWeaver node is one process that runs:
 
-    transport  ->  membership/DHT  ->  gossip  ->  scheduler  ->  tasks
+    transport  ->  DHT  ->  gossip  ->  scheduler  ->  tasks
 
 all on a single asyncio event loop. Each part is a :class:`Module`. The runtime:
 
@@ -31,7 +31,9 @@ from typing import Any, Awaitable, Callable, Iterable, Optional, Sequence
 
 from .config import NodeConfig, load_config, parse_address
 from .logs import NodeLogger, setup_logging
-from .protocol import Dispatcher, Handler, Message, MessageType, node_id_to_hex
+from .protocol import (
+    Dispatcher, Handler, Message, MessageType, StatusReply, node_id_to_hex,
+)
 from .transport import Address, Transport, UdpTransport
 
 NODE_ID_BITS = 160
@@ -168,6 +170,7 @@ class Node:
         try:
             host, port = await self.transport.start(self.config.host, self.config.port)
             self.log.event("module.start", module="transport", host=host, port=port)
+            self.dispatcher.register(MessageType.STATUS, self._on_status)
             for module in self.modules:
                 module.attach(self)
                 for msg_type, handler in module.handlers().items():
@@ -220,6 +223,15 @@ class Node:
     async def __aexit__(self, *exc: Any) -> None:
         await self.stop()
 
+    def peers(self) -> list:
+        """Known peers, from the first module that provides ``peer_list()``
+        (the DHT). Each peer has ``node_id`` (hex) and ``address``."""
+        for module in self.modules:
+            peer_list = getattr(module, "peer_list", None)
+            if callable(peer_list):
+                return list(peer_list())
+        return []
+
     def status(self) -> dict:
         return {
             "name": self.name,
@@ -227,8 +239,15 @@ class Node:
             "address": self.address,
             "state": self.state,
             "uptime": round(time.time() - self.started_at, 1) if self.started_at else 0.0,
+            "peers": len(self.peers()),
             "modules": {m.name: m.status() for m in self.modules},
         }
+
+    def _on_status(self, msg: Message, addr: Address) -> Message:
+        st = self.status()
+        return msg.reply(MessageType.STATUS_REPLY, self.id_hex, StatusReply(
+            name=st["name"], node_id=st["id"], state=st["state"],
+            uptime=st["uptime"], peers=st["peers"], modules=st["modules"]))
 
 
 def _default_transport(node: Node) -> Transport:
@@ -240,12 +259,14 @@ def _default_transport(node: Node) -> Transport:
 def default_modules(config: NodeConfig) -> list[Module]:
     """The modules a node runs, in start order.
 
-    Teammates' modules are added here as their branches are merged:
-    DHT (C) replaces Membership, then gossip and scheduler (D), then tasks (E).
+    DHT (member C) first, so peers exist before gossip (member D) needs them.
+    The scheduler (D) and tasks (E) modules are added here when they land.
     """
-    from .membership import Membership
+    from gossip import GossipModule
 
-    return [Membership()]
+    from .dht.node import DHT
+
+    return [DHT(), GossipModule()]
 
 
 # ---------------------------------------------------------------------------

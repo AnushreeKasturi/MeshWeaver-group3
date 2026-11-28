@@ -4,7 +4,7 @@ import pytest
 
 from meshweaver.config import NodeConfig
 from meshweaver.node import Module, Node, config_from_args, make_node_id
-from meshweaver.protocol import Message, MessageType, Ping, TaskSubmit
+from meshweaver.protocol import Message, MessageType, Ping, Status, TaskSubmit
 from meshweaver.transport import RequestTimeout, TransportError
 
 
@@ -226,3 +226,29 @@ def test_cli_args_build_config():
 def test_cli_multicast_flag():
     assert config_from_args(["--multicast"]).multicast_enabled is True
     assert config_from_args([]).multicast_enabled is False
+
+
+def test_status_request_is_answered_by_the_runtime():
+    async def go():
+        async with Node(cfg(name="st"), modules=[Recorder("dht", [])]) as a, \
+                   Node(cfg(name="asker"), modules=[]) as b:
+            reply = await b.request(a.address, MessageType.STATUS, Status())
+            return reply
+
+    reply = run(go())
+    assert reply.type is MessageType.STATUS_REPLY
+    st = reply.parsed()
+    assert st.name == "st" and st.state == "running" and st.peers == 0
+    assert "dht" in st.modules
+
+
+def test_peers_come_from_the_module_with_peer_list():
+    class FakeDht(Module):
+        name = "dht"
+
+        def peer_list(self):
+            return ["p1", "p2"]
+
+    node = Node(cfg(), modules=[Recorder("x", []), FakeDht()])
+    assert node.peers() == ["p1", "p2"]
+    assert Node(cfg(), modules=[]).peers() == []
