@@ -64,7 +64,6 @@ MeshWeaver-group3/
 │   ├── config.py        # A: ports, intervals, timeouts
 │   ├── logs.py          # A: structured event logging
 │   ├── transport.py     # A: Transport interface + minimal UDP (until B's net/ lands)
-│   ├── membership.py    # A: placeholder peer discovery, being replaced by dht/
 │   ├── cli.py           # A: `meshweaver start` / `submit` (Week 4)
 │   ├── dashboard.py     # A: live rich dashboard (Week 4)
 │   ├── net/             # B: UDP/TCP transport, TLS
@@ -104,11 +103,13 @@ python -m pytest                  # run all tests
 ```bash
 python scripts/launch_mesh.py                       # 10 nodes on ports 9000-9009
 python scripts/launch_mesh.py --nodes 20 --base-port 9100 --log-json
+python scripts/launch_mesh.py --multicast           # no seed addresses: multicast discovery
 ```
 
-The launcher prints each node's peer count until every node knows all the
-others, e.g. `Mesh formed in 2.0s: every node knows all 9 others.` Logs are in
-`logs/node-<i>.log`. Ctrl+C stops every node.
+Each node runs member C's DHT and member D's gossip. The launcher prints every
+node's DHT peer count and the gossip load reports it holds until every node
+knows all the others, e.g. `Mesh formed in 2.0s: every node knows all 9 others.`
+Logs are in `logs/node-<i>.log`. Ctrl+C stops every node.
 
 ### Run a single node
 
@@ -225,9 +226,11 @@ _Last checked: 25 Nov 2026 (end of Week 3). ✅ done · 🟡 partial · ⬜ not 
 | C's DHT in a live 10-node mesh | Every node finds all 9 others |
 | D's gossip in a live 10-node mesh | 30 load reports delivered (10 nodes × 3); a stopped node's load expires everywhere |
 
-**Next integration step:** nodes still start with the placeholder `Membership`.
-Switching `default_modules()` in `node.py` to C's `DHT` plus D's `GossipModule`
-needs D to look up the `"dht"` module instead of `"membership"` at the same time.
+**28 Nov:** C's and D's latest work is merged into `main` (151/151 tests).
+On `member-a`, nodes now run C's `DHT` and D's `GossipModule` by default
+instead of the placeholder, and the launcher shows both:
+`python scripts/launch_mesh.py` (seed) and `--multicast` (no seeds) each form
+a 10-node mesh in about 2 s with gossip load reports flowing.
 
 ### Commit days
 
@@ -250,6 +253,6 @@ The Final Review needs a commit **every day** for the 20 days before it.
 - **A:** Wire C's DHT and D's gossip into `default_modules()`; start the Week 3 end-to-end task path and integration tests.
 - **B:** No commits. The transport in `meshweaver/transport.py` is a placeholder until `net/` lands.
 - **C:** Fix `test_find_node_handler` (use `.peer_infos()`); finish multicast bootstrap using the `multicast_*` settings in `NodeConfig`; Week 3 bucket refresh, dead-peer removal and task records.
-- **D:** Change `node.module("membership")` to `node.module("dht")`; Week 3 router and offer/accept handshake.
+- **D:** Week 3 router (lowest CPU, RAM tie-break, skip stale) and offer/accept handshake in `meshweaver/scheduler/`.
 - **E:** No commits. Task execution blocks the Week 3 end-to-end path.
 - **B and E:** Over 48 hours without a reply must be reported to Infotact with screenshots, and their work reassigned to active members.

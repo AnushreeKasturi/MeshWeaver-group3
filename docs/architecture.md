@@ -175,7 +175,7 @@ class Gossip(Module):
 
     async def _loop(self):
         while True:
-            for peer in self.node.module("membership").peer_list()[:3]:
+            for peer in self.node.peers()[:3]:
                 self.node.send(peer.address, MessageType.GOSSIP_LOAD, report)
             self.log.event("gossip.send", peers=3)
             await asyncio.sleep(self.node.config.gossip_interval)
@@ -193,7 +193,7 @@ payload)`, `self.node.module("name")` (another module), `self.log.event(...)`.
 1. Load config: defaults, then JSON file, then `MESHWEAVER_*` env vars, then CLI flags.
 2. Derive the 160-bit node ID (SHA-1 of the name, or random) and create the `Dispatcher`.
 3. Start the transport; it installs the dispatcher's reply hook.
-4. For each module in order (membership/DHT, gossip, scheduler, tasks):
+4. For each module in order (DHT, gossip, then scheduler and tasks when they land):
    register its handlers, then `await module.start()`.
 5. Log any request types still without a handler (`node.unhandled`).
 
@@ -207,14 +207,23 @@ handlers are removed. The transport closes last and fails any requests still
 waiting for a reply. A background task that crashes is logged and does not
 take the node down.
 
-### Transport and membership placeholders
+### Default modules and the transport placeholder
+
+`default_modules()` starts member C's `DHT` and then member D's `GossipModule`.
+`node.peers()` returns the peers of whichever module provides `peer_list()`
+(the DHT); each has `node_id` (hex) and `address`. Gossip reads its neighbours
+through the DHT's `peer_list()`.
 
 `meshweaver/transport.py` defines the `Transport` interface (`start`, `send`,
-`request`, `close`) and a minimal `UdpTransport`. `meshweaver/membership.py`
-does basic peer discovery with PING and FIND_NODE. Both exist so the runtime,
-the launcher and the integration tests work now. B's `net/` transport and C's
-Kademlia DHT replace them using the same interface and message types, so no
-other code changes.
+`request`, `close`) and a minimal `UdpTransport`, which stands in until
+member B's `net/` transport implements the same interface.
+
+### STATUS
+
+The runtime itself answers `STATUS` with a `StatusReply`: name, node ID,
+state, uptime, peer count and every module's `status()`. No module handles it,
+so asking a node for its status never makes the asker its peer. The launcher
+uses it now and the Week 4 dashboard will too.
 
 On Windows, `UdpTransport` disables `SIO_UDP_CONNRESET`. Without that, a few
 datagrams sent to a dead node make Windows stop delivering packets to the
@@ -226,7 +235,8 @@ socket, and the node goes deaf exactly when a peer dies.
 |---|---|---|
 | `host`, `port`, `seeds` | `127.0.0.1`, `9000`, none | runtime |
 | `max_message_size`, `rpc_timeout` | 60 000 B, 2 s | transport |
-| `k`, `peer_refresh_interval`, `peer_max_misses` | 20, 2 s, 3 | membership / DHT |
+| `k`, `peer_refresh_interval`, `peer_max_misses` | 20, 2 s, 3 | DHT |
+| `multicast_enabled`, `multicast_group`, `multicast_port`, `multicast_interval` | off, 239.255.42.99, 9999, 5 s | DHT discovery |
 | `gossip_interval`, `gossip_fanout`, `stale_after` | 5 s, 3, 15 s | gossip |
 | `heartbeat_interval`, `heartbeat_max_misses`, `task_timeout` | 2 s, 3, 60 s | tasks |
 | `log_level`, `log_json`, `log_file` | INFO, off, none | logging |
@@ -241,11 +251,12 @@ for filtering a 10-node run.
 
 ### Launcher (`scripts/launch_mesh.py`)
 
-Starts N node processes (default 10) on consecutive ports, with node 0 as the
-seed. Once a second it asks every node for its peer list and prints a table,
-then reports how long the mesh took to form. Each node logs to
-`logs/node-<i>.log`. Killing any node process shows the rest dropping it
-within about three refresh intervals.
+Starts N node processes (default 10) on consecutive ports. Node 0 is the seed
+and starts first; the others start once it answers. With `--multicast` no node
+gets a seed and they find each other by multicast. Once a second the launcher
+sends every node `STATUS` and prints each node's DHT peer count and the fresh
+gossip load reports it holds, then reports how long the mesh took to form.
+Each node logs to `logs/node-<i>.log`.
 
 ## 7. Repository and branches
 
