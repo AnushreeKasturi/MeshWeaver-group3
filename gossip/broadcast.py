@@ -64,7 +64,7 @@ class GossipModule(Module):
             )
 
     async def broadcast_load(self):
-        """Send local load information to nearest connected peers."""
+        """Send local load information to nearest DHT peers."""
 
         load_info = await asyncio.to_thread(
             collect_system_load
@@ -77,21 +77,25 @@ class GossipModule(Module):
         )
 
         try:
-            membership = self.node.module("membership")
+            # Week 3: Get peers from the DHT module
+            dht = self.node.module("dht")
 
         except KeyError:
             self.log.event(
                 "gossip.warning",
-                detail="Membership module not available",
+                detail="DHT module not available",
             )
             return
 
-        connected_peers = membership.peer_list()
+        # Get connected peers from DHT
+        connected_peers = dht.peer_list()
 
+        # Select the nearest neighbouring peers
         nearest_peers = get_nearest_neighbours(
             self.node.node_id,
             connected_peers,
             self.node.config.gossip_fanout,
+            log=self.log,
         )
 
         sent_count = 0
