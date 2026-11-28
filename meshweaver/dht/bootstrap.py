@@ -214,12 +214,53 @@ async def multicast_discovery(dht):
 
 
 async def refresh_loop(dht):
-    """Refresh the routing table periodically."""
+    """Refresh routing table and retry seeds when no peers are known."""
 
     while True:
         await asyncio.sleep(dht.node.config.peer_refresh_interval)
 
         try:
+            # Retry configured seeds if the routing table is empty.
+            if not dht.routing_table.get_all_peers():
+
+                dht.log.info(
+                    "Routing table is empty. Retrying seed connections."
+                )
+
+                for host, port in dht.node.config.seeds:
+                    try:
+                        response = await dht.node.request(
+                            (host, port),
+                            MessageType.PING,
+                            Ping(port=dht.node.config.port),
+                            timeout=dht.node.config.rpc_timeout,
+                        )
+
+                        peer_id = node_id_from_hex(response.sender_id)
+
+                        peer = PeerInfo(
+                            node_id=node_id_to_hex(peer_id),
+                            host=host,
+                            port=port,
+                        )
+
+                        dht.add_peer(peer)
+
+                        dht.log.info(
+                            "Reconnected to seed %s:%s",
+                            host,
+                            port,
+                        )
+
+                    except Exception as error:
+                        dht.log.warning(
+                            "Seed retry failed for %s:%s: %s",
+                            host,
+                            port,
+                            error,
+                        )
+
+            # Perform the normal DHT lookup.
             await iterative_find_node(dht, dht.node.node_id)
 
         except asyncio.CancelledError:
@@ -227,9 +268,5 @@ async def refresh_loop(dht):
 
         except Exception as error:
             dht.log.warning("DHT peer refresh failed: %s", error)
-
-
-
-
 
         
