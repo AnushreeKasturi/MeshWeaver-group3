@@ -64,6 +64,10 @@ class MessageType(str, enum.Enum):
     TASK_RESULT = "TASK_RESULT"
     HEARTBEAT = "HEARTBEAT"
 
+    # Node runtime (member A): health and peer summary for the launcher and dashboard.
+    STATUS = "STATUS"
+    STATUS_REPLY = "STATUS_REPLY"
+
     # Generic failure reply, sent by the dispatcher.
     ERROR = "ERROR"
 
@@ -85,6 +89,8 @@ MODULE_OF: dict[MessageType, str] = {
     MessageType.TASK_SUBMIT: "tasks",
     MessageType.TASK_RESULT: "tasks",
     MessageType.HEARTBEAT: "tasks",
+    MessageType.STATUS: "node",
+    MessageType.STATUS_REPLY: "node",
     MessageType.ERROR: "node",
 }
 
@@ -291,6 +297,22 @@ class Heartbeat(Payload):
 
 
 @dataclass
+class Status(Payload):
+    """STATUS request. Answered by the node runtime, never by a module, so
+    asking a node for its status does not make the asker one of its peers."""
+
+
+@dataclass
+class StatusReply(Payload):
+    name: str
+    node_id: str
+    state: str
+    uptime: float
+    peers: int
+    modules: dict = field(default_factory=dict)  # module name -> module.status()
+
+
+@dataclass
 class ErrorInfo(Payload):
     code: str
     detail: str = ""
@@ -312,6 +334,8 @@ PAYLOAD_OF: dict[MessageType, Type[Payload]] = {
     MessageType.TASK_SUBMIT: TaskSubmit,
     MessageType.TASK_RESULT: TaskResult,
     MessageType.HEARTBEAT: Heartbeat,
+    MessageType.STATUS: Status,
+    MessageType.STATUS_REPLY: StatusReply,
     MessageType.ERROR: ErrorInfo,
 }
 
@@ -561,5 +585,5 @@ __all__ = [
     "Payload", "PeerInfo", "Ping", "FindNode", "FindNodeReply", "FindValue",
     "FindValueReply", "Store", "StoreReply", "LoadReport", "TaskOffer",
     "TaskOfferReply", "TaskSubmit", "TaskStatus", "TaskResult", "Heartbeat",
-    "ErrorInfo", "Message", "Dispatcher",
+    "Status", "StatusReply", "ErrorInfo", "Message", "Dispatcher",
 ]
